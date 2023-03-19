@@ -13,7 +13,8 @@ class NTM(nn.Module):
                  controller_size,
                  memory_units,
                  memory_unit_size,
-                 num_heads):
+                 num_heads,
+                 comgra):
         super().__init__()
         self.controller_size = controller_size
         self.controller = NTMController(
@@ -27,8 +28,8 @@ class NTM(nn.Module):
         self.heads = nn.ModuleList([])
         for head in range(num_heads):
             self.heads += [
-                NTMHead('r', controller_size, key_size=memory_unit_size),
-                NTMHead('w', controller_size, key_size=memory_unit_size)
+                NTMHead('r', controller_size, memory_unit_size, comgra, 'r_head'),
+                NTMHead('w', controller_size, memory_unit_size, comgra, 'w_head')
             ]
 
         self.prev_head_weights = []

@@ -5,7 +5,7 @@ from torch import nn
 
 class NTMHead(nn.Module):
 
-    def __init__(self, mode, controller_size, key_size):
+    def __init__(self, mode, controller_size, key_size, comgra, head_name):
         super().__init__()
         self.mode = mode
         self.key_size = key_size
@@ -25,6 +25,9 @@ class NTMHead(nn.Module):
         # fc layer to produce write data. data vector length=key_size
         self.write_data_fc = nn.Linear(controller_size, key_size)
         self.reset()
+
+        self.comgra = comgra
+        self.head_name = head_name
 
     def forward(self, controller_state, prev_weights, memory, data=None):
         """Accept previous state (weights and memory) and controller state,
@@ -66,9 +69,15 @@ class NTMHead(nn.Module):
 
         # all these are marked as "controller outputs" in Figure 2
         key = self.key_fc(controller_state)
-        b = F.softplus(self.key_strength_fc(controller_state))
-        g = F.sigmoid(self.interpolation_gate_fc(controller_state))
-        s = F.softmax(self.shift_weighting_fc(controller_state))
+        b_pre = self.key_strength_fc(controller_state)
+        g_pre = self.interpolation_gate_fc(controller_state)
+        s_pre = self.shift_weighting_fc(controller_state)
+        self.comgra.register_tensor(f"{self.head_name}_b", b_pre, recording_type='neurons')
+        self.comgra.register_tensor(f"{self.head_name}_g", g_pre, recording_type='neurons')
+        self.comgra.register_tensor(f"{self.head_name}_s", s_pre, recording_type='neurons')
+        b = F.softplus(b_pre)
+        g = F.sigmoid(g_pre)
+        s = F.softmax(s_pre)
         # here the sharpening factor is less than 1 whereas as required in the
         # paper it should be greater than 1. hence adding 1.
         y = 1 + F.softplus(self.sharpen_factor_fc(controller_state))

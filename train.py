@@ -81,19 +81,19 @@ configure("runs/")
 # -- initialize datasets, model, criterion and optimizer
 # ----------------------------------------------------------------------------
 
-args.task_json = 'ntm/tasks/copy.json'
+# args.task_json = 'ntm/tasks/copy.json'
 # args.task_json = 'ntm/tasks/repeatcopy.json'
 # args.task_json = 'ntm/tasks/associative.json'
 # args.task_json = 'ntm/tasks/ngram.json'
-# args.task_json = 'ntm/tasks/prioritysort.json'
+args.task_json = 'ntm/tasks/prioritysort.json'
 
 task_params = json.load(open(args.task_json))
 
-dataset = CopyDataset(task_params)
+# dataset = CopyDataset(task_params)
 # dataset = RepeatCopyDataset(task_params)
 # dataset = AssociativeDataset(task_params)
 # dataset = NGram(task_params)
-# dataset = PrioritySort(task_params)
+dataset = PrioritySort(task_params)
 
 """
 For the Copy task, input_size: seq_width + 2, output_size: seq_width
@@ -102,12 +102,13 @@ For the Associative task, input_size: seq_width + 2, output_size: seq_width
 For the NGram task, input_size: 1, output_size: 1
 For the Priority Sort task, input_size: seq_width + 1, output_size: seq_width
 """
-ntm = NTM(input_size=task_params['seq_width'] + 2,
+ntm = NTM(input_size=task_params['seq_width'] + 1,
           output_size=task_params['seq_width'],
           controller_size=task_params['controller_size'],
           memory_units=task_params['memory_units'],
           memory_unit_size=task_params['memory_unit_size'],
-          num_heads=task_params['num_heads'])
+          num_heads=task_params['num_heads'],
+          comgra=COMGRA_RECORDER)
 
 COMGRA_RECORDER.track_module("root_module", ntm)
 
@@ -151,7 +152,11 @@ for iter in tqdm(range(args.num_iters)):
         record_all_tensors_per_batch_index_by_default=False,
         override__recording_is_active=None,
     )
-
+    # TODO
+    #  -make it record attention values
+    #    -what even is Softplus?
+    #  -investigate: The results were different from what the website shows. Why?
+    #  -add regularization_loss
     # -------------------------------------------------------------------------
     # loop for other tasks
     # -------------------------------------------------------------------------
