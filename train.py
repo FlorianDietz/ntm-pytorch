@@ -153,6 +153,12 @@ for iter in tqdm(range(args.num_iters)):
         override__recording_is_active=None,
     )
     # TODO
+    #  -fix the code.
+    #    I think the problem is that traversing the graph backwards goes into the previous iteration because not all inputs are marked as such
+    #      consider just changing the graph backwards code to skip that stuff.
+    #    (the previous version that just used a single iteration crashed in the recording, assert debug < 100000)
+    #   -I fixed the code, BUT DONT KNOW WHY THAT WORKED.
+    #    --> Investigate more deeply what comgra did/does.
     #  -make it record attention values
     #    -what even is Softplus?
     #  -investigate: The results were different from what the website shows. Why?
@@ -162,23 +168,30 @@ for iter in tqdm(range(args.num_iters)):
     # -------------------------------------------------------------------------
     num_iterations = input.size()[0] + target.size()[0]
     in_data_base = torch.unsqueeze(torch.zeros(input.size()[1]), 0)
-    COMGRA_RECORDER.start_forward_pass(
-        iteration=0,
-        configuration_type=f'num_iters_{num_iterations}',
-    )
     for iteration in range(num_iterations):
-        COMGRA_RECORDER.FAKE_ITERATION = iteration
+        if iteration == 0:
+            iteration_type = 'a'
+        elif iteration < input.size()[0]:
+            iteration_type = 'b'
+        elif iteration == num_iterations - 1:
+            iteration_type = 'd'
+        else:
+            iteration_type = 'c'
+        COMGRA_RECORDER.start_forward_pass(
+            iteration=iteration,
+            configuration_type=f'num_iters_{num_iterations}_{iteration_type}',
+        )
         if iteration < input.size()[0]:
             # to maintain consistency in dimensions as torch.cat was throwing error
             in_data = torch.unsqueeze(input[iteration], 0)
-            COMGRA_RECORDER.register_tensor(f"in_data_{iteration}", in_data, is_input=True, recording_type='neurons')
+            COMGRA_RECORDER.register_tensor(f"in_data", in_data, is_input=True, recording_type='neurons')
             out_ = ntm(in_data)
-            COMGRA_RECORDER.register_tensor(f"out_per_iteration_{iteration}", out_, is_output=True, recording_type='neurons')
+            COMGRA_RECORDER.register_tensor(f"out_per_iteration", out_, is_output=True, recording_type='neurons')
         else:
             in_data = in_data_base.clone()
-            COMGRA_RECORDER.register_tensor(f"in_data_{iteration}", in_data, is_input=True, recording_type='neurons')
+            COMGRA_RECORDER.register_tensor(f"in_data", in_data, is_input=True, recording_type='neurons')
             out_ = ntm(in_data)
-            COMGRA_RECORDER.register_tensor(f"out_per_iteration_{iteration}", out_, is_output=True, recording_type='neurons')
+            COMGRA_RECORDER.register_tensor(f"out_per_iteration", out_, is_output=True, recording_type='neurons')
             out[iteration - input.size()[0]] = out_
         if iteration == num_iterations - 1:
             COMGRA_RECORDER.start_backward_pass()
@@ -193,7 +206,7 @@ for iter in tqdm(range(args.num_iters)):
             optimizer.step()
             COMGRA_RECORDER.register_tensor(f"loss", loss, is_loss=True)
             COMGRA_RECORDER.record_current_gradients(f"gradients")
-    COMGRA_RECORDER.finish_iteration(sanity_check__verify_graph_and_global_status_equal_existing_file=iter < 1000 * 1000)
+        COMGRA_RECORDER.finish_iteration(sanity_check__verify_graph_and_global_status_equal_existing_file=iter < 1000 * 1000)
     COMGRA_RECORDER.finish_batch()
     binary_output = out.clone()
     binary_output = binary_output.detach().apply_(lambda x: 0 if x < 0.5 else 1)
