@@ -1,7 +1,10 @@
 import json
+import shutil
+
 from tqdm import tqdm
 import numpy as np
 import os
+from pathlib import Path
 
 import torch
 from torch import nn, optim
@@ -11,6 +14,64 @@ from ntm import NTM
 from ntm.datasets import CopyDataset, RepeatCopyDataset, AssociativeDataset, NGram, PrioritySort
 from ntm.args import get_parser
 
+import comgra.recorder
+from comgra.recorder import ComgraRecorder
+from comgra.objects import DecisionMakerForRecordingsFrequencyPerType
+from comgra import utilities as comgra_utilities
+
+COMGRA_RECORDER = None
+
+comgra_root_path = Path(__file__).parent / 'comgra_data'
+comgra_group = 'group_0'
+shutil.rmtree(comgra_root_path / comgra_group, ignore_errors=True)
+
+COMGRA_RECORDER = ComgraRecorder(
+    # The root folder for all comgra data
+    comgra_root_path=comgra_root_path,
+    # All runs of comgra that share the same 'group' will be loaded in the same application
+    # when you run the server.py application with that group as the name argument.
+    # They can then be selected by their 'trial_id' and compared.
+    group=comgra_group, trial_id='example_trial',
+    # These parameters can be left empty, but it is recommended to fill them in
+    # if your computational graph is complex.
+    # They ensure that similar module parameters get grouped together visually.
+    # All module parameters whose complete name (including the list of names of modules they are contained in)
+    # match one of these prefixes are grouped together.
+    # This can also be used to group tensors together that have a variable number of occurrences,
+    # for example the elements of an attention mechanism.
+    prefixes_for_grouping_module_parameters_visually=[
+        'root_module.controller',
+        'root_module.heads',
+        'root_module.memory',
+    ],
+    prefixes_for_grouping_module_parameters_in_nodes=[],
+    # Parameters that will be recorded in a JSON file, to help you with comparing things later.
+    parameters_of_trial={},
+    # How often do you want comgra to make a recording?
+    # There are several options for this.
+    # This one is often the most effective one:
+    # At the beginning of each training step later in this code, you specify what the type of this recording is.
+    # For example, you could differentiate between randomly selected training and training on a specific example
+    # that you would like to inspect in more detail.
+    # This recording type ensures that a recording is made if the last training of the specified type was at least
+    # N training steps ago.
+    # In this way, you make sure that each type gets recorded often enough to be useful.
+    decision_maker_for_recordings=DecisionMakerForRecordingsFrequencyPerType(min_training_steps_difference=1000),
+    # Comgra records data both in terms of statistics over the batch dimension and in terms of
+    # individual items in the batch.
+    # If batches are large, this consumes too much memory and slows down the recording.
+    # This number tells comgra only to record the first N items of each batch.
+    # Note that the statistics over the batch that also get recorded are still calculated over the whole batch.
+    max_num_batch_size_to_record=5,
+    # Use this to turn comgra off throughout your whole project.
+    comgra_is_active=True,
+    # A performance parameter you can experiment with if comgra is too slow.
+    # If this is too low, comgra becomes slow.
+    # If this is too high, the program may crash due to memory problems.
+    max_num_mappings_to_save_at_once_during_serialization=10000,
+    # An optional feature to skip the recording of KPIs that are particularly expensive to calculate.
+    calculate_svd_and_other_expensive_operations_of_parameters=False,
+)
 
 args = get_parser().parse_args()
 
@@ -21,22 +82,18 @@ configure("runs/")
 # ----------------------------------------------------------------------------
 
 args.task_json = 'ntm/tasks/copy.json'
-'''
-args.task_json = 'ntm/tasks/repeatcopy.json'
-args.task_json = 'ntm/tasks/associative.json'
-args.task_json = 'ntm/tasks/ngram.json'
-args.task_json = 'ntm/tasks/prioritysort.json'
-'''
+# args.task_json = 'ntm/tasks/repeatcopy.json'
+# args.task_json = 'ntm/tasks/associative.json'
+# args.task_json = 'ntm/tasks/ngram.json'
+# args.task_json = 'ntm/tasks/prioritysort.json'
 
 task_params = json.load(open(args.task_json))
 
 dataset = CopyDataset(task_params)
-'''
-dataset = RepeatCopyDataset(task_params)
-dataset = AssociativeDataset(task_params)
-dataset = NGram(task_params)
-dataset = PrioritySort(task_params)
-'''
+# dataset = RepeatCopyDataset(task_params)
+# dataset = AssociativeDataset(task_params)
+# dataset = NGram(task_params)
+# dataset = PrioritySort(task_params)
 
 """
 For the Copy task, input_size: seq_width + 2, output_size: seq_width
@@ -52,6 +109,8 @@ ntm = NTM(input_size=task_params['seq_width'] + 2,
           memory_unit_size=task_params['memory_unit_size'],
           num_heads=task_params['num_heads'])
 
+COMGRA_RECORDER.track_module("root_module", ntm)
+
 criterion = nn.BCELoss()
 # As the learning rate is task specific, the argument can be moved to json file
 optimizer = optim.RMSprop(ntm.parameters(),
@@ -64,12 +123,10 @@ optimizer = optim.Adam(ntm.parameters(), lr=args.lr,
 '''
 
 args.saved_model = 'saved_model_copy.pt'
-'''
-args.saved_model = 'saved_model_repeatcopy.pt'
-args.saved_model = 'saved_model_associative.pt'
-args.saved_model = 'saved_model_ngram.pt'
-args.saved_model = 'saved_model_prioritysort.pt'
-'''
+# args.saved_model = 'saved_model_repeatcopy.pt'
+# args.saved_model = 'saved_model_associative.pt'
+# args.saved_model = 'saved_model_ngram.pt'
+# args.saved_model = 'saved_model_prioritysort.pt'
 
 cur_dir = os.getcwd()
 PATH = os.path.join(cur_dir, args.saved_model)
@@ -87,39 +144,51 @@ for iter in tqdm(range(args.num_iters)):
     input, target = data['input'], data['target']
     out = torch.zeros(target.size())
 
+    COMGRA_RECORDER.start_next_recording(
+        iter, 1,
+        is_training_mode=True,
+        type_of_execution_for_diversity_of_recordings='type_of_execution_0',
+        record_all_tensors_per_batch_index_by_default=False,
+        override__recording_is_active=None,
+    )
+
     # -------------------------------------------------------------------------
     # loop for other tasks
     # -------------------------------------------------------------------------
-    for i in range(input.size()[0]):
-        # to maintain consistency in dimensions as torch.cat was throwing error
-        in_data = torch.unsqueeze(input[i], 0)
-        ntm(in_data)
-
-    # passing zero vector as input while generating target sequence
-    in_data = torch.unsqueeze(torch.zeros(input.size()[1]), 0)
-    for i in range(target.size()[0]):
-        out[i] = ntm(in_data)
-    # -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------
-    # loop for NGram task
-    # -------------------------------------------------------------------------
-    '''
-    for i in range(task_params['seq_len'] - 1):
-        in_data = input[i].view(1, -1)
-        ntm(in_data)
-        target_data = torch.zeros([1]).view(1, -1)
-        out[i] = ntm(target_data)
-    '''
-    # -------------------------------------------------------------------------
-
-    loss = criterion(out, target)
-    losses.append(loss.item())
-    loss.backward()
-    # clips gradient in the range [-10,10]. Again there is a slight but
-    # insignificant deviation from the paper where they are clipped to (-10,10)
-    nn.utils.clip_grad_value_(ntm.parameters(), 10)
-    optimizer.step()
-
+    num_iterations = input.size()[0] + target.size()[0]
+    in_data_base = torch.unsqueeze(torch.zeros(input.size()[1]), 0)
+    COMGRA_RECORDER.start_forward_pass(
+        iteration=0,
+        configuration_type=f'num_iters_{num_iterations}',
+    )
+    for iteration in range(num_iterations):
+        if iteration < input.size()[0]:
+            # to maintain consistency in dimensions as torch.cat was throwing error
+            in_data = torch.unsqueeze(input[iteration], 0)
+            COMGRA_RECORDER.register_tensor(f"in_data_{iteration}", in_data, is_input=True, recording_type='neurons')
+            out_ = ntm(in_data)
+            COMGRA_RECORDER.register_tensor(f"out_per_iteration_{iteration}", out_, is_output=True, recording_type='neurons')
+        else:
+            in_data = in_data_base.clone()
+            COMGRA_RECORDER.register_tensor(f"in_data_{iteration}", in_data, is_input=True, recording_type='neurons')
+            out_ = ntm(in_data)
+            COMGRA_RECORDER.register_tensor(f"out_per_iteration_{iteration}", out_, is_output=True, recording_type='neurons')
+            out[iteration - input.size()[0]] = out_
+        if iteration == num_iterations - 1:
+            COMGRA_RECORDER.start_backward_pass()
+            COMGRA_RECORDER.register_tensor(f"out", out.reshape(-1).unsqueeze(0), is_output=True, recording_type='neurons')
+            COMGRA_RECORDER.register_tensor(f"target", target.reshape(-1).unsqueeze(0), is_target=True, recording_type='neurons')
+            loss = criterion(out, target)
+            losses.append(loss.item())
+            loss.backward()
+            # clips gradient in the range [-10,10]. Again there is a slight but
+            # insignificant deviation from the paper where they are clipped to (-10,10)
+            nn.utils.clip_grad_value_(ntm.parameters(), 10)
+            optimizer.step()
+            COMGRA_RECORDER.register_tensor(f"loss", loss, is_loss=True)
+            COMGRA_RECORDER.record_current_gradients(f"gradients")
+    COMGRA_RECORDER.finish_iteration(sanity_check__verify_graph_and_global_status_equal_existing_file=iter < 1000 * 1000)
+    COMGRA_RECORDER.finish_batch()
     binary_output = out.clone()
     binary_output = binary_output.detach().apply_(lambda x: 0 if x < 0.5 else 1)
 
