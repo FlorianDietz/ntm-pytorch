@@ -28,8 +28,8 @@ class NTM(nn.Module):
         self.heads = nn.ModuleList([])
         for head in range(num_heads):
             self.heads += [
-                NTMHead('r', controller_size, memory_unit_size, comgra, 'r_head'),
-                NTMHead('w', controller_size, memory_unit_size, comgra, 'w_head')
+                NTMHead('r', controller_size, memory_unit_size, comgra, f'r_head_{head}'),
+                NTMHead('w', controller_size, memory_unit_size, comgra, f'w_head_{head}')
             ]
 
         self.prev_head_weights = []

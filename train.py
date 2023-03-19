@@ -167,6 +167,7 @@ for iter in tqdm(range(args.num_iters)):
         configuration_type=f'num_iters_{num_iterations}',
     )
     for iteration in range(num_iterations):
+        COMGRA_RECORDER.FAKE_ITERATION = iteration
         if iteration < input.size()[0]:
             # to maintain consistency in dimensions as torch.cat was throwing error
             in_data = torch.unsqueeze(input[iteration], 0)
