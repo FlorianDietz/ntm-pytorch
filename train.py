@@ -123,11 +123,11 @@ optimizer = optim.Adam(ntm.parameters(), lr=args.lr,
                        betas=(args.beta1, args.beta2))
 '''
 
-args.saved_model = 'saved_model_copy.pt'
+# args.saved_model = 'saved_model_copy.pt'
 # args.saved_model = 'saved_model_repeatcopy.pt'
 # args.saved_model = 'saved_model_associative.pt'
 # args.saved_model = 'saved_model_ngram.pt'
-# args.saved_model = 'saved_model_prioritysort.pt'
+args.saved_model = 'saved_model_prioritysort.pt'
 
 cur_dir = os.getcwd()
 PATH = os.path.join(cur_dir, args.saved_model)
