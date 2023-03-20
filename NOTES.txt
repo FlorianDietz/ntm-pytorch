@@ -1,4 +1,4 @@
 
 
 condor_submit ~/PycharmProjects/ntm-pytorch/server_script.sub -interactive
-./htcondor_shortcut_ntm.sh
+./htcondor_shortcut_ntm.sh 0

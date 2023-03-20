@@ -26,6 +26,8 @@ from comgra import utilities as comgra_utilities
 
 COMGRA_RECORDER = None
 
+os.chdir(str(Path(__file__).parent))
+
 comgra_root_path = Path(__file__).parent / 'comgra_data'
 comgra_group = 'group_0'
 tensorboard_base_path = Path(__file__).parent / 'runs'
