@@ -72,9 +72,19 @@ class NTMHead(nn.Module):
         b_pre = self.key_strength_fc(controller_state)
         g_pre = self.interpolation_gate_fc(controller_state)
         s_pre = self.shift_weighting_fc(controller_state)
-        self.comgra.register_tensor(f"{self.head_name}_b", b_pre, recording_type='neurons')
-        self.comgra.register_tensor(f"{self.head_name}_g", g_pre, recording_type='neurons')
-        self.comgra.register_tensor(f"{self.head_name}_s", s_pre, recording_type='neurons')
+        if self.comgra.RECORD_YES_NO:
+            self.comgra.register_tensor(
+                f"{self.head_name}_{self.comgra.ITERATION}_b", b_pre.clone().detach(), recording_type='neurons', is_target=True,
+                node_name=f"head_b", role_within_node=f"{self.head_name}_{self.comgra.ITERATION}_b"
+            )
+            self.comgra.register_tensor(
+                f"{self.head_name}_{self.comgra.ITERATION}_g", g_pre.clone().detach(), recording_type='neurons', is_target=True,
+                node_name=f"head_g", role_within_node=f"{self.head_name}_{self.comgra.ITERATION}_g"
+            )
+            self.comgra.register_tensor(
+                f"{self.head_name}_{self.comgra.ITERATION}_s", s_pre.clone().detach(), recording_type='neurons', is_target=True,
+                node_name=f"head_s", role_within_node=f"{self.head_name}_{self.comgra.ITERATION}_s"
+            )
         b = F.softplus(b_pre)
         g = F.sigmoid(g_pre)
         s = F.softmax(s_pre)
