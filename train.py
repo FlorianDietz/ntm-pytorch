@@ -16,6 +16,9 @@ from ntm import NTM
 from ntm.datasets import CopyDataset, RepeatCopyDataset, AssociativeDataset, NGram, PrioritySort
 from ntm.args import get_parser
 
+import sys
+sys.path.append(str(Path(__file__).parent.parent / 'comgra'))
+
 import comgra.recorder
 from comgra.recorder import ComgraRecorder
 from comgra.objects import DecisionMakerForRecordingsFrequencyPerType
