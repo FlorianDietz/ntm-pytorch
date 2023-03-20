@@ -11,6 +11,7 @@ def get_parser():
                         help='batch size of input sequence during training')
     parser.add_argument('-num_iters', type=int, default=100000,
                         help='number of iterations for training')
+    parser.add_argument('-trial_index', type=int, default=0)
 
     # todo: only rmsprop optimizer supported yet, support adam too
     parser.add_argument('-lr', type=float, default=1e-4,

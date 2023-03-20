@@ -25,14 +25,15 @@ COMGRA_RECORDER = None
 
 comgra_root_path = Path(__file__).parent / 'comgra_data'
 comgra_group = 'group_0'
-shutil.rmtree(comgra_root_path / comgra_group, ignore_errors=True)
-
 tensorboard_base_path = Path(__file__).parent / 'runs'
-shutil.rmtree(tensorboard_base_path, ignore_errors=True)
-configure("runs/")
 
-def do_the_thing(trial_index):
-    writer_for_tensorboard = tensorboard.SummaryWriter(str(tensorboard_base_path / f"trial_{trial_index}"))
+def do_the_thing():
+    args = get_parser().parse_args()
+    trial_index = args.trial_index
+    if trial_index == 0:
+        shutil.rmtree(comgra_root_path / comgra_group, ignore_errors=True)
+        shutil.rmtree(tensorboard_base_path, ignore_errors=True)
+    configure(str(tensorboard_base_path / f"trial_{trial_index}"))
     COMGRA_RECORDER = ComgraRecorder(
         # The root folder for all comgra data
         comgra_root_path=comgra_root_path,
@@ -80,8 +81,7 @@ def do_the_thing(trial_index):
         # An optional feature to skip the recording of KPIs that are particularly expensive to calculate.
         calculate_svd_and_other_expensive_operations_of_parameters=False,
     )
-
-    args = get_parser().parse_args()
+    COMGRA_RECORDER.REGULARIZATION = [None, 5, 10, 20, 50][trial_index]
 
     # ----------------------------------------------------------------------------
     # -- initialize datasets, model, criterion and optimizer
@@ -166,8 +166,9 @@ def do_the_thing(trial_index):
         in_data_base = torch.unsqueeze(torch.zeros(input.size()[1]), 0)
         COMGRA_RECORDER.start_forward_pass(
             # PROBLEM: "NTM memory operations will be performed in-place" breaks comgra
-            configuration_type=f'num_iters_{num_iterations}',
+            configuration_type=f'num_iters_{num_iterations}_{COMGRA_RECORDER.REGULARIZATION}',
         )
+        COMGRA_RECORDER.REGULARIZATION_LOSSES = []
         for iteration in range(num_iterations):
             COMGRA_RECORDER.ITERATION = iteration
             COMGRA_RECORDER.RECORD_YES_NO = (iteration in [0, 1, 5, 10, num_iterations - 1])
@@ -193,12 +194,18 @@ def do_the_thing(trial_index):
                 COMGRA_RECORDER.register_tensor(f"target", target.reshape(-1).unsqueeze(0), is_target=True, recording_type='neurons')
                 loss = criterion(out, target)
                 losses.append(loss.item())
-                loss.backward()
+                loss.backward(retain_graph=COMGRA_RECORDER.REGULARIZATION)
+                COMGRA_RECORDER.register_tensor(f"loss", loss, is_loss=True)
+                if COMGRA_RECORDER.REGULARIZATION:
+                    reg_loss = None
+                    for reg_loss_ in COMGRA_RECORDER.REGULARIZATION_LOSSES:
+                        reg_loss = reg_loss_ if reg_loss is None else (reg_loss + reg_loss_)
+                    reg_loss.backward()
+                    COMGRA_RECORDER.register_tensor(f"regularization_loss", reg_loss.detach(), is_loss=True)
                 # clips gradient in the range [-10,10]. Again there is a slight but
                 # insignificant deviation from the paper where they are clipped to (-10,10)
                 nn.utils.clip_grad_value_(ntm.parameters(), 10)
                 optimizer.step()
-                COMGRA_RECORDER.register_tensor(f"loss", loss, is_loss=True)
                 COMGRA_RECORDER.record_current_gradients(f"gradients")
         COMGRA_RECORDER.finish_iteration(sanity_check__verify_graph_and_global_status_equal_existing_file=iter < 1000 * 1000)
         COMGRA_RECORDER.finish_batch()
@@ -215,6 +222,8 @@ def do_the_thing(trial_index):
                 print('Iteration: %d\tLoss: %.2f\tError in bits per sequence: %.2f' %
                       (iter, np.mean(losses), np.mean(errors)))
                 log_value('train_loss', np.mean(losses), iter)
+                if COMGRA_RECORDER.REGULARIZATION:
+                    log_value('regularization_loss', reg_loss, iter)
                 log_value('bit_error_per_sequence', np.mean(errors), iter)
                 losses = []
                 errors = []
@@ -224,4 +233,4 @@ def do_the_thing(trial_index):
         # torch.save(ntm, PATH)
 
 
-do_the_thing(0)
+do_the_thing()

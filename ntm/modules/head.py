@@ -85,6 +85,12 @@ class NTMHead(nn.Module):
                 f"{self.head_name}_{self.comgra.ITERATION}_s", s_pre.clone().detach(), recording_type='neurons', is_target=True,
                 node_name=f"head_s", role_within_node=f"{self.head_name}_{self.comgra.ITERATION}_s"
             )
+        if self.comgra.REGULARIZATION:
+            for tensor_to_regularize in [g_pre, s_pre]:
+                target = tensor_to_regularize.clamp(min=-1 * self.comgra.REGULARIZATION, max=self.comgra.REGULARIZATION).detach()
+                loss_granular = torch.nn.functional.mse_loss(tensor_to_regularize, target, reduction='none')
+                regularization_loss = loss_granular.mean()
+                self.comgra.REGULARIZATION_LOSSES.append(regularization_loss)
         b = F.softplus(b_pre)
         g = F.sigmoid(g_pre)
         s = F.softmax(s_pre)
