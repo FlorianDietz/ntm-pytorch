@@ -9,7 +9,7 @@ def get_parser():
                         help='path to file with final model parameters')
     parser.add_argument('-batch_size', type=int, default=1,
                         help='batch size of input sequence during training')
-    parser.add_argument('-num_iters', type=int, default=100000,
+    parser.add_argument('-num_iters', type=int, default=300000,#100000
                         help='number of iterations for training')
     parser.add_argument('-trial_index', type=int, default=0)
 
