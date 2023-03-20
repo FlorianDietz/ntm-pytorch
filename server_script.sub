@@ -1,0 +1,14 @@
+# HTCondor submit description file
+# Everything with a leading # is a comment
+
+universe                = docker
+docker_image            = docker.lsv.uni-saarland.de/ntm:latest
+initialdir              = /nethome/fdietz/PycharmProjects/
+output                  = /data/users/fdietz/htcondor-logfiles/run.sh.$(ClusterId).$(Year)_$(Month)_$(Day)_$(SUBMIT_TIME).out
+error                   = /data/users/fdietz/htcondor-logfiles/run.sh.$(ClusterId).$(Year)_$(Month)_$(Day)_$(SUBMIT_TIME).err
+log                     = /data/users/fdietz/htcondor-logfiles/run.sh.$(ClusterId).$(Year)_$(Month)_$(Day)_$(SUBMIT_TIME).log
+request_CPUs            = 1
+request_memory          = 100G
+request_GPUs            = 1
+#requirements            = (GPUs_GlobalMemoryMb >= 16000) && (machine == "cl17lx.lsv.uni-saarland.de")
+queue 1
