@@ -38,7 +38,7 @@ def do_the_thing():
     if trial_index == 0:
         shutil.rmtree(comgra_root_path / comgra_group, ignore_errors=True)
         shutil.rmtree(tensorboard_base_path, ignore_errors=True)
-    configure(str(tensorboard_base_path / f"trial_{trial_index}"))
+    writer_for_tensorboard = tensorboard.SummaryWriter(str(tensorboard_base_path / 'trial' / f"trial_{trial_index}"))
     COMGRA_RECORDER = ComgraRecorder(
         # The root folder for all comgra data
         comgra_root_path=comgra_root_path,
@@ -199,14 +199,15 @@ def do_the_thing():
                 COMGRA_RECORDER.register_tensor(f"target", target.reshape(-1).unsqueeze(0), is_target=True, recording_type='neurons')
                 loss = criterion(out, target)
                 losses.append(loss.item())
-                loss.backward(retain_graph=COMGRA_RECORDER.REGULARIZATION)
                 COMGRA_RECORDER.register_tensor(f"loss", loss, is_loss=True)
+                total_loss = loss
                 if COMGRA_RECORDER.REGULARIZATION:
                     reg_loss = None
                     for reg_loss_ in COMGRA_RECORDER.REGULARIZATION_LOSSES:
                         reg_loss = reg_loss_ if reg_loss is None else (reg_loss + reg_loss_)
-                    reg_loss.backward()
                     COMGRA_RECORDER.register_tensor(f"regularization_loss", reg_loss.detach(), is_loss=True)
+                    total_loss += reg_loss
+                total_loss.backward()
                 # clips gradient in the range [-10,10]. Again there is a slight but
                 # insignificant deviation from the paper where they are clipped to (-10,10)
                 nn.utils.clip_grad_value_(ntm.parameters(), 10)
@@ -222,16 +223,15 @@ def do_the_thing():
         errors.append(error.item())
 
         # ---logging---
-        if trial_index == 0:
-            if iter % 200 == 0:
-                print('Iteration: %d\tLoss: %.2f\tError in bits per sequence: %.2f' %
-                      (iter, np.mean(losses), np.mean(errors)))
-                log_value('train_loss', np.mean(losses), iter)
-                if COMGRA_RECORDER.REGULARIZATION:
-                    log_value('regularization_loss', reg_loss, iter)
-                log_value('bit_error_per_sequence', np.mean(errors), iter)
-                losses = []
-                errors = []
+        if iter % 200 == 0:
+            print('Iteration: %d\tLoss: %.2f\tError in bits per sequence: %.2f' %
+                  (iter, np.mean(losses), np.mean(errors)))
+            writer_for_tensorboard.add_scalar('train_loss', np.mean(losses), iter)
+            if COMGRA_RECORDER.REGULARIZATION:
+                writer_for_tensorboard.add_scalar('regularization_loss', reg_loss, iter)
+            writer_for_tensorboard.add_scalar('bit_error_per_sequence', np.mean(errors), iter)
+            losses = []
+            errors = []
     if trial_index == 0:
         # ---saving the model---
         torch.save(ntm.state_dict(), PATH)

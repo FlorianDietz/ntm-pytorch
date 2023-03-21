@@ -2,3 +2,5 @@
 
 condor_submit ~/PycharmProjects/ntm-pytorch/server_script.sub -interactive
 ./htcondor_shortcut_ntm.sh 0
+
+cd ~/PycharmProjects/ntm-pytorch & python3 -m tensorboard.main --logdir=runs --port=7002
