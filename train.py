@@ -206,7 +206,7 @@ def do_the_thing():
                     for reg_loss_ in COMGRA_RECORDER.REGULARIZATION_LOSSES:
                         reg_loss = reg_loss_ if reg_loss is None else (reg_loss + reg_loss_)
                     COMGRA_RECORDER.register_tensor(f"regularization_loss", reg_loss.detach(), is_loss=True)
-                    total_loss += reg_loss
+                    total_loss = total_loss + reg_loss
                 total_loss.backward()
                 # clips gradient in the range [-10,10]. Again there is a slight but
                 # insignificant deviation from the paper where they are clipped to (-10,10)
