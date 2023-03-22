@@ -90,7 +90,7 @@ def do_the_thing():
         # An optional feature to skip the recording of KPIs that are particularly expensive to calculate.
         calculate_svd_and_other_expensive_operations_of_parameters=False,
     )
-    COMGRA_RECORDER.REGULARIZATION = [None, 5, 10, 20, 50][trial_index]
+    COMGRA_RECORDER.REGULARIZATION = [None, 3, 5, 10, 20][trial_index]
 
     # ----------------------------------------------------------------------------
     # -- initialize datasets, model, criterion and optimizer
