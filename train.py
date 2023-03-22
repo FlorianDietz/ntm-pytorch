@@ -31,6 +31,7 @@ os.chdir(str(Path(__file__).parent))
 comgra_root_path = Path(__file__).parent / 'comgra_data'
 comgra_group = 'group_0'
 tensorboard_base_path = Path(__file__).parent / 'runs'
+saved_models_base_path = Path(__file__).parent / 'saved_models'
 
 def do_the_thing():
     args = get_parser().parse_args()
@@ -38,6 +39,9 @@ def do_the_thing():
     if trial_index == 0:
         shutil.rmtree(comgra_root_path / comgra_group, ignore_errors=True)
         shutil.rmtree(tensorboard_base_path, ignore_errors=True)
+        shutil.rmtree(saved_models_base_path, ignore_errors=True)
+    saved_models = saved_models_base_path / f'trial_{trial_index}'
+    saved_models.mkdir(parents=True, exist_ok=True)
     writer_for_tensorboard = tensorboard.SummaryWriter(str(tensorboard_base_path / 'trial' / f"trial_{trial_index}"))
     COMGRA_RECORDER = ComgraRecorder(
         # The root folder for all comgra data
@@ -134,15 +138,6 @@ def do_the_thing():
                            betas=(args.beta1, args.beta2))
     '''
 
-    # args.saved_model = 'saved_model_copy.pt'
-    # args.saved_model = 'saved_model_repeatcopy.pt'
-    # args.saved_model = 'saved_model_associative.pt'
-    # args.saved_model = 'saved_model_ngram.pt'
-    args.saved_model = 'saved_model_prioritysort.pt'
-
-    cur_dir = os.getcwd()
-    PATH = os.path.join(cur_dir, args.saved_model)
-
     # ----------------------------------------------------------------------------
     # -- basic training loop
     # ----------------------------------------------------------------------------
@@ -232,10 +227,9 @@ def do_the_thing():
             writer_for_tensorboard.add_scalar('bit_error_per_sequence', np.mean(errors), iter)
             losses = []
             errors = []
-    if trial_index == 0:
-        # ---saving the model---
-        torch.save(ntm.state_dict(), PATH)
-        # torch.save(ntm, PATH)
+        if (iter + 1) % 10000 == 0:
+            torch.save(ntm.state_dict(), saved_models / f'saved_model_{iter}.pt')
+            # torch.save(ntm, PATH)
 
 
 do_the_thing()
