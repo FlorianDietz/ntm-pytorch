@@ -227,7 +227,7 @@ def do_the_thing():
             writer_for_tensorboard.add_scalar('bit_error_per_sequence', np.mean(errors), iter)
             losses = []
             errors = []
-        if (iter + 1) % 10000 == 0:
+        if (iter + 1) % 1000 == 0:
             torch.save(ntm.state_dict(), saved_models / f'saved_model_{iter}.pt')
             # torch.save(ntm, PATH)
 
