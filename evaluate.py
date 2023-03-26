@@ -2,6 +2,7 @@ import json
 import os
 import re
 
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
 
@@ -83,52 +84,62 @@ def run_test(saved_model, name, trial_iteration):
     # -----------------------------------------------------------------------------
     # --- evaluation
     # -----------------------------------------------------------------------------
-    ntm.reset()
-    data = dataset[0]  # 0 is a dummy index
-    input, target = data['input'], data['target']
-    out = torch.zeros(target.size())
 
-    # -----------------------------------------------------------------------------
-    # loop for other tasks
-    # -----------------------------------------------------------------------------
-    for i in range(input.size()[0]):
-        # to maintain consistency in dimensions as torch.cat was throwing error
-        in_data = torch.unsqueeze(input[i], 0)
-        ntm(in_data)
+    num_datasets = 1000
 
-    # passing zero vector as the input while generating target sequence
-    in_data = torch.unsqueeze(torch.zeros(input.size()[1]), 0)
-    for i in range(target.size()[0]):
-        out[i] = ntm(in_data)
-    # -----------------------------------------------------------------------------
-    # -----------------------------------------------------------------------------
-    # loop for NGram task
-    # -----------------------------------------------------------------------------
-    '''
-    for i in range(task_params['seq_len'] - 1):
-        in_data = input[i].view(1, -1)
-        ntm(in_data)
-        target_data = torch.zeros([1]).view(1, -1)
-        out[i] = ntm(target_data)
-    '''
-    # -----------------------------------------------------------------------------
+    losses = []
+    errors = []
+    with torch.no_grad():
+        for iter in tqdm(range(num_datasets)):
+            ntm.reset()
+            data = dataset[300000 + iter]
+            input, target = data['input'], data['target']
+            out = torch.zeros(target.size())
 
-    loss = criterion(out, target)
+            # -----------------------------------------------------------------------------
+            # loop for other tasks
+            # -----------------------------------------------------------------------------
+            for i in range(input.size()[0]):
+                # to maintain consistency in dimensions as torch.cat was throwing error
+                in_data = torch.unsqueeze(input[i], 0)
+                ntm(in_data)
 
-    binary_output = out.clone()
-    binary_output = binary_output.detach().apply_(lambda x: 0 if x < 0.5 else 1)
+            # passing zero vector as the input while generating target sequence
+            in_data = torch.unsqueeze(torch.zeros(input.size()[1]), 0)
+            for i in range(target.size()[0]):
+                out[i] = ntm(in_data)
+            # -----------------------------------------------------------------------------
+            # -----------------------------------------------------------------------------
+            # loop for NGram task
+            # -----------------------------------------------------------------------------
+            '''
+            for i in range(task_params['seq_len'] - 1):
+                in_data = input[i].view(1, -1)
+                ntm(in_data)
+                target_data = torch.zeros([1]).view(1, -1)
+                out[i] = ntm(target_data)
+            '''
+            # -----------------------------------------------------------------------------
 
-    # sequence prediction error is calculted in bits per sequence
-    error = torch.sum(torch.abs(binary_output - target))
+            loss = criterion(out, target)
+            losses.append(loss.item())
+
+            binary_output = out.clone()
+            binary_output = binary_output.detach().apply_(lambda x: 0 if x < 0.5 else 1)
+
+            # sequence prediction error is calculted in bits per sequence
+            error = torch.sum(torch.abs(binary_output - target))
+            errors.append(error.item())
+
+    avg_loss = sum(losses) / len(losses)
+    avg_error = sum(errors) / len(errors)
 
     # ---logging---
-    print('Loss: %.2f\tError in bits per sequence: %.2f' % (loss, error))
+    print('Loss: %.2f\tError in bits per sequence: %.2f' % (avg_loss, avg_error))
 
-    # ---saving results---
-    result = {'output': binary_output, 'target': target}
     writer_for_tensorboard = tensorboard.SummaryWriter(str(tensorboard_base_path / 'eval' / name))
-    writer_for_tensorboard.add_scalar('error', error, trial_iteration)
-    writer_for_tensorboard.add_scalar('loss', loss, trial_iteration)
+    writer_for_tensorboard.add_scalar('error', avg_error, trial_iteration)
+    writer_for_tensorboard.add_scalar('loss', avg_loss, trial_iteration)
 
 os.chdir(str(Path(__file__).parent))
 tensorboard_base_path = Path(__file__).parent / 'runs_eval'

@@ -1,1 +1,1 @@
-python /nethome/fdietz/PycharmProjects/ntm-pytorch/train.py -trial_index $1
+python /nethome/fdietz/PycharmProjects/ntm-pytorch/evaluate.py
