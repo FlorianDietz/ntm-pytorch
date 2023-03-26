@@ -17,6 +17,8 @@ from ntm.args import get_parser
 
 args = get_parser().parse_args()
 
+os.chdir(str(Path(__file__).parent))
+
 # args.task_json = 'ntm/tasks/copy.json'
 # args.task_json = 'ntm/tasks/repeatcopy.json'
 # args.task_json = 'ntm/tasks/associative.json'
@@ -141,7 +143,6 @@ def run_test(saved_model, name, trial_iteration):
     writer_for_tensorboard.add_scalar('error', avg_error, trial_iteration)
     writer_for_tensorboard.add_scalar('loss', avg_loss, trial_iteration)
 
-os.chdir(str(Path(__file__).parent))
 tensorboard_base_path = Path(__file__).parent / 'runs_eval'
 tensorboard_base_path.mkdir(exist_ok=True)
 saved_models_base_path = Path(__file__).parent / 'saved_models'
