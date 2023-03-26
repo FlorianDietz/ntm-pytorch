@@ -148,10 +148,11 @@ tensorboard_base_path.mkdir(exist_ok=True)
 saved_models_base_path = Path(__file__).parent / 'saved_models'
 files = [(b, a.name, int(re.match('saved_model_(.*).pt', b.name).group(1))) for a in saved_models_base_path.iterdir() for b in a.iterdir()]
 
+
+files.sort(key=lambda a: (a[1], a[2]))
 print("SKIPPING FILES. TOO MANY.")
 files = files[0::10]
 
-files.sort(key=lambda a: (a[1], a[2]))
 for i, (saved_model, trial_name, trial_iteration) in enumerate(files):
     print(f"Entry {i} of {len(files)}", trial_iteration)
     run_test(saved_model, f'{trial_name}', trial_iteration)
